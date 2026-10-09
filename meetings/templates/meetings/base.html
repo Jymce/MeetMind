@@ -1,0 +1,208 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MeetMind — Local AI Meeting Intelligence{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+    <!-- Fonts (self-hosted for 100% offline operation) -->
+    <link rel="stylesheet" href="{% static 'fonts/fonts.css' %}">
+
+    <!-- Lucide Icons (vendored v1.54.0 — offline) -->
+    <script src="{% static 'vendor/lucide.min.js' %}"></script>
+
+    <!-- Tailwind CSS (vendored — offline) -->
+    <script src="{% static 'vendor/tailwind.js' %}"></script>
+    <script>
+        tailwind.config = {
+            darkMode: ["class"],
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Geist', 'sans-serif'],
+                        mono: ['Geist Mono', 'monospace'],
+                    },
+                    colors: {
+                        border: "hsl(var(--border))",
+                        input: "hsl(var(--input))",
+                        ring: "hsl(var(--ring))",
+                        background: "hsl(var(--background))",
+                        foreground: "hsl(var(--foreground))",
+                        primary: {
+                            DEFAULT: "hsl(var(--primary))",
+                            foreground: "hsl(var(--primary-foreground))",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(var(--secondary))",
+                            foreground: "hsl(var(--secondary-foreground))",
+                        },
+                        destructive: {
+                            DEFAULT: "hsl(var(--destructive))",
+                            foreground: "hsl(var(--destructive-foreground))",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(var(--muted))",
+                            foreground: "hsl(var(--muted-foreground))",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(var(--accent))",
+                            foreground: "hsl(var(--accent-foreground))",
+                        },
+                        popover: {
+                            DEFAULT: "hsl(var(--popover))",
+                            foreground: "hsl(var(--popover-foreground))",
+                        },
+                        card: {
+                            DEFAULT: "hsl(var(--card))",
+                            foreground: "hsl(var(--card-foreground))",
+                        },
+                    },
+                    borderRadius: {
+                        lg: "var(--radius)",
+                        md: "calc(var(--radius) - 2px)",
+                        sm: "calc(var(--radius) - 4px)",
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- shadcn/ui Dark Zinc Design Tokens -->
+    <style>
+        :root {
+            --background: 240 10% 3.9%;
+            --foreground: 0 0% 98%;
+            --card: 240 10% 4.8%;
+            --card-foreground: 0 0% 98%;
+            --popover: 240 10% 3.9%;
+            --popover-foreground: 0 0% 98%;
+            --primary: 0 0% 98%;
+            --primary-foreground: 240 5.9% 10%;
+            --secondary: 240 3.7% 15.9%;
+            --secondary-foreground: 0 0% 98%;
+            --muted: 240 3.7% 15.9%;
+            --muted-foreground: 240 5% 64.9%;
+            --accent: 240 3.7% 15.9%;
+            --accent-foreground: 0 0% 98%;
+            --destructive: 0 62.8% 30.6%;
+            --destructive-foreground: 0 0% 98%;
+            --border: 240 3.7% 15.9%;
+            --input: 240 3.7% 15.9%;
+            --ring: 240 4.9% 83.9%;
+            --radius: 0.5rem;
+        }
+
+        body {
+            font-family: 'Geist', sans-serif;
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Custom Scrollbar in shadcn style */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: hsl(var(--muted));
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: hsl(var(--muted-foreground) / 0.5);
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+    <!-- shadcn Navigation Bar -->
+    <header class="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div class="container mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-8">
+            <div class="flex items-center gap-6">
+                <!-- Brand Logo -->
+                <a href="{% url 'dashboard' %}" class="flex items-center gap-2.5 transition-opacity hover:opacity-90">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                        <i data-lucide="brain" class="h-5 w-5"></i>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold tracking-tight text-lg">Meet<span class="text-zinc-400">Mind</span></span>
+                        <span class="inline-flex items-center rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300 ring-1 ring-inset ring-zinc-700/50">LOCAL AI</span>
+                    </div>
+                </a>
+
+                <!-- Nav Links -->
+                <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
+                    <a href="{% url 'dashboard' %}" class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors {% if request.resolver_match.url_name == 'dashboard' %}bg-secondary text-foreground font-semibold{% else %}text-muted-foreground hover:bg-secondary/50 hover:text-foreground{% endif %}">
+                        <i data-lucide="layout-dashboard" class="h-4 w-4"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="{% url 'upload' %}" class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors {% if request.resolver_match.url_name == 'upload' %}bg-secondary text-foreground font-semibold{% else %}text-muted-foreground hover:bg-secondary/50 hover:text-foreground{% endif %}">
+                        <i data-lucide="upload-cloud" class="h-4 w-4"></i>
+                        <span>Process Recording</span>
+                    </a>
+                    <a href="{% url 'search' %}" class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors {% if request.resolver_match.url_name == 'search' %}bg-secondary text-foreground font-semibold{% else %}text-muted-foreground hover:bg-secondary/50 hover:text-foreground{% endif %}">
+                        <i data-lucide="search" class="h-4 w-4"></i>
+                        <span>Semantic Search</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Right: Offline Badge & Actions -->
+            <div class="flex items-center gap-3">
+                <div class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <i data-lucide="shield-check" class="h-3.5 w-3.5"></i>
+                    <span>100% On-Device</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 container mx-auto max-w-7xl px-4 py-8 sm:px-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- shadcn Footer -->
+    <footer class="border-t border-border/40 bg-background/50 py-6 text-xs text-muted-foreground">
+        <div class="container mx-auto max-w-7xl px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="font-medium text-foreground flex items-center gap-1.5">
+                    <i data-lucide="cpu" class="h-3.5 w-3.5 text-emerald-400"></i> Local Stack:
+                </span>
+                <span class="rounded bg-secondary px-2 py-0.5 font-mono text-[11px] text-zinc-300">Whisper Small (CUDA)</span>
+                <span class="rounded bg-secondary px-2 py-0.5 font-mono text-[11px] text-zinc-300">Phi-3 Mini (Ollama)</span>
+                <span class="rounded bg-secondary px-2 py-0.5 font-mono text-[11px] text-zinc-300">EasyOCR</span>
+                <span class="rounded bg-secondary px-2 py-0.5 font-mono text-[11px] text-zinc-300">all-MiniLM-L6-v2 (ChromaDB)</span>
+            </div>
+            <div>
+                <span>Local AI Hackathon 2026 • Zero Cloud Egress</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+    <script src="{% static 'js/app.js' %}?v=6"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Render Django messages as toast notifications
+        {% if messages %}
+        {% for message in messages %}
+        showToast("{{ message|escapejs }}", "{{ message.tags }}");
+        {% endfor %}
+        {% endif %}
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

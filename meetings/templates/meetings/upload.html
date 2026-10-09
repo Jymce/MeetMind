@@ -1,0 +1,131 @@
+{% extends 'meetings/base.html' %}
+
+{% block title %}Upload Meeting — MeetMind Local AI{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <!-- Breadcrumb -->
+    <div>
+        <a href="{% url 'dashboard' %}" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <i data-lucide="arrow-left" class="h-3.5 w-3.5"></i>
+            <span>Back to Dashboard</span>
+        </a>
+    </div>
+
+    <!-- Upload Card -->
+    <div class="rounded-xl border border-border bg-card p-6 sm:p-8 text-card-foreground shadow-sm space-y-6">
+        <div class="space-y-1.5 border-b border-border pb-5">
+            <h1 class="text-xl font-bold tracking-tight">Upload Meeting Recording</h1>
+            <p class="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                Upload a recorded meeting video (e.g. from Zoom, Teams, Google Meet, or OBS). MeetMind will automatically split the audio, perform OCR on slide frames, and run local AI correlation.
+            </p>
+        </div>
+
+        {% if error %}
+        <div class="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+            <i data-lucide="alert-circle" class="h-4 w-4 shrink-0"></i>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <form action="{% url 'upload' %}" method="POST" enctype="multipart/form-data" class="space-y-6" id="uploadForm">
+            {% csrf_token %}
+            
+            <!-- Meeting Name Input -->
+            <div class="space-y-2">
+                <label for="title" class="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Meeting Title / Topic</label>
+                <input 
+                    type="text" 
+                    id="title" 
+                    name="title" 
+                    placeholder="e.g. Q4 Strategy & Infrastructure Review" 
+                    class="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    required
+                >
+                <p class="text-[11px] text-muted-foreground">Used for organization and vector database indexing.</p>
+            </div>
+
+            <!-- Video File Dropzone -->
+            <div class="space-y-2">
+                <label class="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Meeting Video Recording</label>
+                <div 
+                    id="dropZone" 
+                    class="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-background/30 p-8 text-center transition hover:border-zinc-500 hover:bg-secondary/30 cursor-pointer"
+                >
+                    <input 
+                        type="file" 
+                        id="video_file" 
+                        name="video_file" 
+                        accept="video/mp4,video/webm,video/mkv,video/avi,.mp4,.webm,.mkv,.avi" 
+                        class="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
+                        required
+                    >
+                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-primary mb-3">
+                        <i data-lucide="video" class="h-6 w-6"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-sm font-medium text-foreground">
+                            <span class="text-primary hover:underline">Click to browse</span> or drag and drop
+                        </p>
+                        <p class="text-xs text-muted-foreground">MP4, WEBM, MKV, or AVI (up to 500MB)</p>
+                    </div>
+
+                    <!-- Selected file badge -->
+                    <div id="fileSelectedInfo" class="mt-4 hidden items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
+                        <i data-lucide="check-circle" class="h-3.5 w-3.5"></i>
+                        <span id="fileName"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step by Step Pipeline Indicator (shadcn Card) -->
+            <div class="rounded-lg border border-border/60 bg-secondary/30 p-4 space-y-3">
+                <div class="flex items-center gap-2 text-xs font-semibold text-primary">
+                    <i data-lucide="cpu" class="h-3.5 w-3.5"></i>
+                    <span>Automatic Local Pipeline Breakdown</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="flex items-start gap-2">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-[10px] font-bold text-foreground">1</span>
+                        <div>
+                            <p class="font-medium text-foreground">Demuxing</p>
+                            <p class="text-[11px] text-muted-foreground">FFmpeg extracts audio & samples slides.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-[10px] font-bold text-foreground">2</span>
+                        <div>
+                            <p class="font-medium text-foreground">Whisper STT</p>
+                            <p class="text-[11px] text-muted-foreground">Transcribes audio with word timestamps.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-[10px] font-bold text-foreground">3</span>
+                        <div>
+                            <p class="font-medium text-foreground">EasyOCR</p>
+                            <p class="text-[11px] text-muted-foreground">Reads text off diagrams and slides.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-[10px] font-bold text-foreground">4</span>
+                        <div>
+                            <p class="font-medium text-foreground">Phi-3 Reasoning</p>
+                            <p class="text-[11px] text-muted-foreground">Synthesizes multi-modal correlations.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button 
+                type="submit" 
+                id="submitBtn" 
+                class="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+                <i data-lucide="sparkles" class="mr-2 h-4 w-4"></i>
+                <span>Start Local AI Processing</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

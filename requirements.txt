@@ -1,0 +1,11 @@
+django>=5.0,<6.0
+faster-whisper>=1.0.0
+av<19
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+Pillow>=10.0.0
+requests>=2.31.0
+# OCR — EasyOCR (torch already required above). PaddleOCR has no Python 3.14 wheels.
+easyocr>=1.7
+python-dotenv>=1.0.0
+reportlab>=4.0

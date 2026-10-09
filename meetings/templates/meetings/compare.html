@@ -1,0 +1,150 @@
+{% extends 'meetings/base.html' %}
+
+{% block title %}Compare Meetings — MeetMind{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/50">
+        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+            <a href="{% url 'dashboard' %}" class="hover:text-foreground transition-colors flex items-center gap-1">
+                <i data-lucide="layout-dashboard" class="h-3.5 w-3.5"></i>
+                <span>Library</span>
+            </a>
+            <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+            <span class="font-medium text-foreground">Compare Meetings</span>
+        </div>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-300">
+            <i data-lucide="git-compare" class="h-3 w-3"></i>
+            {{ comparison_data|length }} Sessions
+        </span>
+    </div>
+
+    <!-- Common Topics (cross-meeting semantic overlap) -->
+    {% if common_topics %}
+    <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="rounded-md bg-emerald-500/10 p-1.5 text-emerald-400">
+                <i data-lucide="network" class="h-4 w-4"></i>
+            </div>
+            <div>
+                <h3 class="text-sm font-semibold text-foreground">Shared Topics Across Meetings</h3>
+                <p class="text-[11px] text-muted-foreground">Terms ranked by local TF-IDF analysis — present in every selected session.</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% for topic in common_topics %}
+            <span class="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300">{{ topic }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Side-by-Side Comparison Cards -->
+    <div class="grid grid-cols-1 {% if comparison_data|length == 2 %}lg:grid-cols-2{% else %}lg:grid-cols-3{% endif %} gap-5 items-start">
+        {% for data in comparison_data %}
+        <div class="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col">
+            <!-- Card Header -->
+            <div class="p-5 border-b border-border/50 space-y-2 bg-secondary/20">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                        <i data-lucide="check" class="h-3 w-3"></i> Completed
+                    </span>
+                    {% if data.meeting.duration_seconds %}
+                    <span class="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground font-mono">
+                        <i data-lucide="clock" class="h-3 w-3"></i> {{ data.meeting.duration_seconds|floatformat:0 }}s
+                    </span>
+                    {% endif %}
+                    <span class="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground font-mono">
+                        <i data-lucide="link" class="h-3 w-3"></i> {{ data.correlations|length }} correlations
+                    </span>
+                </div>
+                <h2 class="text-base font-semibold tracking-tight text-foreground leading-snug">
+                    <a href="{% url 'meeting_detail' data.meeting.id %}" class="hover:text-indigo-300 transition-colors">{{ data.meeting.title }}</a>
+                </h2>
+                <p class="text-[11px] text-muted-foreground">{{ data.meeting.created_at|date:"F j, Y • g:i A" }} • {{ data.transcript_count }} turns • {{ data.frame_count }} slides</p>
+            </div>
+
+            <div class="p-5 space-y-5">
+                <!-- Executive Summary -->
+                <div class="space-y-1.5">
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <i data-lucide="file-text" class="h-3 w-3 text-indigo-400"></i> Executive Summary
+                    </h4>
+                    <p class="text-xs text-foreground/90 leading-relaxed">
+                        {% if data.summary %}{{ data.summary.overview }}{% else %}<span class="text-muted-foreground italic">No summary available.</span>{% endif %}
+                    </p>
+                </div>
+
+                <!-- Key Points -->
+                <div class="space-y-1.5">
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <i data-lucide="lightbulb" class="h-3 w-3 text-amber-400"></i> Key Points
+                    </h4>
+                    <ul class="space-y-1.5">
+                        {% for point in data.key_points %}
+                        <li class="flex items-start gap-1.5 text-xs text-foreground/90 leading-snug">
+                            <i data-lucide="chevron-right" class="h-3.5 w-3.5 text-indigo-400 shrink-0 mt-px"></i>
+                            <span>{{ point }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="text-xs text-muted-foreground italic">None identified.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <!-- Action Items -->
+                <div class="space-y-1.5">
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <i data-lucide="check-square" class="h-3 w-3 text-emerald-400"></i> Action Items
+                    </h4>
+                    <ul class="space-y-1.5">
+                        {% for item in data.action_items %}
+                        <li class="flex items-start gap-1.5 text-xs text-foreground/90 leading-snug">
+                            <i data-lucide="square" class="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-px"></i>
+                            <span>{{ item }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="text-xs text-muted-foreground italic">None identified.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card Footer -->
+            <div class="mt-auto px-5 py-3 border-t border-border/50">
+                <a href="{% url 'meeting_detail' data.meeting.id %}" class="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+                    Open full analysis <i data-lucide="arrow-right" class="h-3 w-3"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Combined Action Items -->
+    {% if combined_action_items %}
+    <div class="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2">
+            <div class="rounded-md bg-emerald-500/10 p-1.5 text-emerald-400">
+                <i data-lucide="list-checks" class="h-4 w-4"></i>
+            </div>
+            <h3 class="text-base font-semibold">Combined Action Items</h3>
+            <span class="rounded-md bg-secondary px-2 py-0.5 font-mono text-[11px] text-muted-foreground">{{ combined_action_items|length }}</span>
+        </div>
+        <ul class="space-y-2">
+            {% for item in combined_action_items %}
+            <li class="flex items-start gap-3 rounded-md p-2 text-xs sm:text-sm hover:bg-secondary/40 transition">
+                <input type="checkbox" class="mt-0.5 h-4 w-4 rounded border-input bg-background accent-indigo-500">
+                <div class="flex-1">
+                    <span class="text-foreground leading-snug">{{ item.text }}</span>
+                    <span class="block text-[10px] text-muted-foreground mt-0.5">
+                        <i data-lucide="video" class="h-2.5 w-2.5 inline-block mr-0.5"></i>{{ item.meeting }}
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

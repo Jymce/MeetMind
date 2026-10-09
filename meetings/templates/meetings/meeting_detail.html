@@ -1,0 +1,421 @@
+{% extends 'meetings/base.html' %}
+
+{% block title %}{{ meeting.title }} — MeetMind Intelligence{% endblock %}
+
+{% block content %}
+<div class="space-y-6" id="meetingDetailContainer" data-meeting-id="{{ meeting.id }}" data-status="{{ meeting.status }}">
+    <!-- Top Bar: Breadcrumb + Action Controls -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/50">
+        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+            <a href="{% url 'dashboard' %}" class="hover:text-foreground transition-colors flex items-center gap-1">
+                <i data-lucide="layout-dashboard" class="h-3.5 w-3.5"></i>
+                <span>Library</span>
+            </a>
+            <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+            <span class="font-medium text-foreground truncate max-w-sm">{{ meeting.title }}</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            {% if meeting.status == 'completed' %}
+            <a href="{% url 'export_pdf' meeting.id %}" class="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-400 shadow-sm transition hover:bg-indigo-500/20 focus-visible:outline-none">
+                <i data-lucide="file-down" class="h-3.5 w-3.5"></i>
+                <span>Export PDF</span>
+            </a>
+            {% endif %}
+            {% if meeting.status == 'completed' or meeting.status == 'failed' %}
+            <a href="{% url 'reprocess_meeting' meeting.id %}" class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition hover:bg-secondary focus-visible:outline-none" onclick="return confirm('Re-run local AI processing from scratch?');">
+                <i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>
+                <span>Re-run Analysis</span>
+            </a>
+            {% endif %}
+            <button 
+                onclick="deleteMeeting('{{ meeting.id }}', this);" 
+                class="inline-flex items-center gap-1.5 rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 shadow-sm transition hover:bg-rose-500/20 hover:border-rose-500/40 focus-visible:outline-none"
+            >
+                <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                <span>Delete Session</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Pipeline Status Banner (Live Polling) -->
+    <div id="processingCard" class="rounded-xl border border-amber-500/30 bg-amber-500/[0.04] p-6 shadow-sm transition {% if meeting.status == 'completed' %}hidden{% elif meeting.status == 'failed' %}border-rose-500/30 bg-rose-500/[0.04]{% endif %}">
+        <div class="flex items-start gap-4">
+            <div class="rounded-lg bg-amber-500/10 p-3 text-amber-400 shrink-0">
+                {% if meeting.status == 'failed' %}
+                    <i data-lucide="alert-triangle" class="h-6 w-6 text-rose-400"></i>
+                {% else %}
+                    <i data-lucide="loader-2" class="h-6 w-6 animate-spin"></i>
+                {% endif %}
+            </div>
+            <div class="flex-1 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 id="statusLabel" class="text-base font-semibold text-foreground">{{ meeting.get_status_display }}</h3>
+                        <p id="statusDetail" class="text-xs text-muted-foreground mt-0.5">{{ meeting.status_detail }}</p>
+                    </div>
+                    <span id="progressPercentage" class="font-mono text-lg font-bold text-amber-400">{{ meeting.progress }}%</span>
+                </div>
+
+                <!-- shadcn Progress Bar -->
+                <div class="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                    <div id="progressBarFill" class="h-full bg-gradient-to-r from-amber-500 to-indigo-500 transition-all duration-300" style="width: {{ meeting.progress }}%;"></div>
+                </div>
+
+                <p class="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                    <i data-lucide="cpu" class="h-3 w-3 text-emerald-400"></i>
+                    <span>Running locally on your device hardware (sequential VRAM offload). Updates live.</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meeting Hero / Details (Shown when complete or summary available) -->
+    <div id="resultsContainer" class="space-y-6 {% if meeting.status != 'completed' and not summary %}hidden{% endif %}">
+        <!-- Hero Header -->
+        <div class="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="space-y-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
+                            <i data-lucide="check" class="h-3 w-3"></i> Processed Locally
+                        </span>
+                        {% if meeting.duration_seconds %}
+                        <span class="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
+                            <i data-lucide="clock" class="h-3 w-3"></i> {{ meeting.duration_seconds|floatformat:0 }}s
+                        </span>
+                        {% endif %}
+                        <span class="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
+                            <i data-lucide="image" class="h-3 w-3"></i> {{ frame_count }} slides
+                        </span>
+                        <span class="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
+                            <i data-lucide="message-square" class="h-3 w-3"></i> {{ transcript_count }} turns
+                        </span>
+                    </div>
+
+                    <h1 class="text-2xl font-bold tracking-tight text-foreground">{{ meeting.title }}</h1>
+                    <p class="text-xs text-muted-foreground">Session created on {{ meeting.created_at|date:"F j, Y • g:i A" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- shadcn Tabs Bar -->
+        <div class="flex items-center rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto">
+            <button class="tab-btn inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md px-3.5 py-1.5 text-xs font-medium transition-all bg-background text-foreground shadow-sm" data-tab="tab-correlated">
+                <i data-lucide="sparkles" class="h-3.5 w-3.5 text-indigo-400"></i>
+                <span>Correlated Insights</span>
+            </button>
+            <button class="tab-btn inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md px-3.5 py-1.5 text-xs font-medium transition-all hover:text-foreground" data-tab="tab-timeline">
+                <i data-lucide="film" class="h-3.5 w-3.5"></i>
+                <span>Video & Transcript</span>
+            </button>
+            <button class="tab-btn inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md px-3.5 py-1.5 text-xs font-medium transition-all hover:text-foreground" data-tab="tab-slides">
+                <i data-lucide="images" class="h-3.5 w-3.5"></i>
+                <span>Screen OCR Gallery ({{ frame_count }})</span>
+            </button>
+            <button class="tab-btn inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md px-3.5 py-1.5 text-xs font-medium transition-all hover:text-foreground" data-tab="tab-chat">
+                <i data-lucide="bot" class="h-3.5 w-3.5 text-emerald-400"></i>
+                <span>Ask AI Copilot (Local RAG)</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: CORRELATED INSIGHTS -->
+        <div class="tab-pane space-y-6 block" id="tab-correlated">
+            {% if summary %}
+            <!-- Executive Summary Card -->
+            <div class="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+                <div class="flex items-center gap-2">
+                    <div class="rounded-md bg-secondary p-1.5 text-primary">
+                        <i data-lucide="file-text" class="h-4 w-4"></i>
+                    </div>
+                    <h3 class="text-base font-semibold">Executive Summary</h3>
+                </div>
+                <p class="text-sm leading-relaxed text-foreground/90">{{ summary.overview }}</p>
+
+                {% if summary.full_summary %}
+                <div class="pt-4 border-t border-border/50 space-y-2">
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Comprehensive Briefing</h4>
+                    <div class="text-xs sm:text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                        {{ summary.full_summary }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Speech ↔ Screen Correlation (Multi-Modal Innovation) -->
+            <div class="rounded-xl border border-indigo-500/30 bg-indigo-500/[0.03] p-6 shadow-sm space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="rounded-md bg-indigo-500/10 p-1.5 text-indigo-400">
+                            <i data-lucide="link" class="h-4 w-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-semibold text-foreground">Speech ↔ Screen Correlation</h3>
+                            <p class="text-xs text-muted-foreground">Multi-modal connections between what was spoken and what was projected on screen.</p>
+                        </div>
+                    </div>
+                    <span class="hidden sm:inline-flex items-center rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
+                        MULTI-MODAL INTELLIGENCE
+                    </span>
+                </div>
+
+                <!-- Correlations List -->
+                <div class="space-y-3 pt-2">
+                    {% if correlations %}
+                        {% for c in correlations %}
+                        <div class="rounded-lg border border-border bg-card p-4 transition hover:border-zinc-600 space-y-3">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-mono text-emerald-400 font-semibold flex items-center gap-1">
+                                    <i data-lucide="clock" class="h-3 w-3"></i> 
+                                    {% if c.timestamp %}{{ c.timestamp }}s{% else %}{{ c.timestamp|default:"00:00" }}{% endif %}
+                                </span>
+                                <span class="text-[11px] text-muted-foreground">Synchronized Event</span>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                <!-- Spoken text -->
+                                <div class="space-y-1">
+                                    <span class="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <i data-lucide="mic" class="h-3 w-3 text-indigo-400"></i> What Was Said
+                                    </span>
+                                    <p class="text-foreground leading-relaxed">
+                                        {% if c.speech %}{{ c.speech|truncatewords:35 }}{% else %}{{ c.speech_text|truncatewords:35 }}{% endif %}
+                                    </p>
+                                </div>
+
+                                <!-- Screen OCR -->
+                                <div class="space-y-1">
+                                    <span class="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <i data-lucide="monitor" class="h-3 w-3 text-cyan-400"></i> Screen Content (OCR)
+                                    </span>
+                                    <p class="font-mono text-[11px] text-zinc-300 bg-secondary/50 p-2 rounded max-h-20 overflow-y-auto leading-tight">
+                                        {% if c.screen %}{{ c.screen|truncatewords:35 }}{% else %}{{ c.screen_text|truncatewords:35 }}{% endif %}
+                                    </p>
+                                </div>
+
+                                <!-- AI Correlation -->
+                                <div class="space-y-1">
+                                    <span class="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <i data-lucide="sparkles" class="h-3 w-3 text-amber-400"></i> AI Synthesis
+                                    </span>
+                                    <p class="text-indigo-200 font-medium leading-relaxed">
+                                        {{ c.insight|default:"Correlated via timestamp proximity during presentation." }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="p-8 text-center text-xs text-muted-foreground">
+                            No direct screen-speech correlations were generated for this recording.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Two-column: Action items & Discussion Points -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Action Items -->
+                <div class="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+                    <div class="flex items-center gap-2">
+                        <div class="rounded-md bg-emerald-500/10 p-1.5 text-emerald-400">
+                            <i data-lucide="check-square" class="h-4 w-4"></i>
+                        </div>
+                        <h3 class="text-base font-semibold">Action Items & Next Steps</h3>
+                    </div>
+
+                    <div class="space-y-2">
+                        {% if action_items %}
+                            {% for item in action_items %}
+                            <label class="flex items-start gap-3 rounded-md p-2 transition hover:bg-secondary/40 cursor-pointer text-xs sm:text-sm">
+                                <input type="checkbox" class="mt-0.5 h-4 w-4 rounded border-input bg-background text-primary focus:ring-primary accent-indigo-500">
+                                <span class="text-foreground leading-snug">{{ item }}</span>
+                            </label>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-xs text-muted-foreground">No specific action items identified.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Discussion Points -->
+                <div class="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+                    <div class="flex items-center gap-2">
+                        <div class="rounded-md bg-amber-500/10 p-1.5 text-amber-400">
+                            <i data-lucide="lightbulb" class="h-4 w-4"></i>
+                        </div>
+                        <h3 class="text-base font-semibold">Key Discussion Takeaways</h3>
+                    </div>
+
+                    <ul class="space-y-2 text-xs sm:text-sm">
+                        {% if key_points %}
+                            {% for point in key_points %}
+                            <li class="flex items-start gap-2 text-muted-foreground">
+                                <i data-lucide="chevron-right" class="h-4 w-4 text-primary shrink-0 mt-0.5"></i>
+                                <span class="text-foreground leading-snug">{{ point }}</span>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-xs text-muted-foreground">No key discussion points identified.</p>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            {% else %}
+            <div class="rounded-xl border border-border bg-card p-12 text-center text-muted-foreground text-sm">
+                <i data-lucide="clock" class="h-8 w-8 mx-auto mb-2 text-amber-400"></i>
+                <p>Local AI models are analyzing this session. Insights will appear automatically.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- TAB 2: INTERACTIVE VIDEO & TRANSCRIPT -->
+        <div class="tab-pane space-y-6 hidden" id="tab-timeline">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <!-- Video Player (7 Cols) -->
+                <div class="lg:col-span-7 rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                    <div class="aspect-video bg-black flex items-center justify-center">
+                        {% if meeting.video_file %}
+                        <video id="meetingVideo" controls preload="metadata" class="w-full h-full object-contain">
+                            <source src="{{ meeting.video_file.url }}" type="video/mp4">
+                            Your browser does not support video playback.
+                        </video>
+                        {% endif %}
+                    </div>
+                    <div class="p-3 bg-secondary/20 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+                        <span class="flex items-center gap-1.5">
+                            <i data-lucide="crosshair" class="h-3.5 w-3.5 text-primary"></i> Click any transcript turn to jump the playback.
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Synchronized Transcript (5 Cols) -->
+                <div class="lg:col-span-5 rounded-xl border border-border bg-card shadow-sm flex flex-col h-[520px]">
+                    <div class="p-4 border-b border-border flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="quote" class="h-4 w-4 text-primary"></i>
+                            <h3 class="text-sm font-semibold">Spoken Transcript</h3>
+                        </div>
+                        <span class="rounded bg-secondary px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                            {{ transcript_count }} turns
+                        </span>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-4 space-y-2.5" id="transcriptStream">
+                        {% for seg in transcript_segments %}
+                        <div 
+                            class="transcript-turn group flex items-start gap-3 rounded-lg p-2.5 transition hover:bg-secondary/60 cursor-pointer text-xs" 
+                            data-start="{{ seg.start_time }}" 
+                            onclick="seekVideo({{ seg.start_time }})"
+                        >
+                            <span class="font-mono text-[11px] font-semibold text-cyan-400 rounded bg-cyan-950/40 px-1.5 py-0.5 shrink-0 group-hover:bg-cyan-900/60">
+                                {{ seg.formatted_start }}
+                            </span>
+                            <p class="text-foreground/90 leading-relaxed">{{ seg.text }}</p>
+                        </div>
+                        {% empty %}
+                        <div class="p-8 text-center text-xs text-muted-foreground">
+                            No transcript segments generated yet.
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: SCREEN OCR GALLERY -->
+        <div class="tab-pane space-y-6 hidden" id="tab-slides">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for frame in screen_frames %}
+                <div class="group rounded-xl border border-border bg-card overflow-hidden shadow-sm transition hover:border-zinc-600 cursor-pointer" onclick="seekVideo({{ frame.timestamp }})">
+                    <div class="relative aspect-video bg-black">
+                        <img src="/media/{{ frame.frame_path }}" alt="Slide at {{ frame.formatted_timestamp }}" class="w-full h-full object-contain" loading="lazy">
+                        <span class="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-black/80 backdrop-blur px-2 py-0.5 font-mono text-[10px] text-white">
+                            <i data-lucide="play" class="h-2.5 w-2.5"></i> {{ frame.formatted_timestamp }}
+                        </span>
+                    </div>
+                    <div class="p-3.5 space-y-2">
+                        <div class="flex items-center justify-between text-xs text-muted-foreground">
+                            <span class="font-medium text-foreground">Extracted Screen OCR</span>
+                            <span class="font-mono text-[10px]">T={{ frame.timestamp }}s</span>
+                        </div>
+                        <div class="rounded-md bg-secondary/50 p-2 text-xs font-mono text-zinc-300 max-h-24 overflow-y-auto leading-relaxed">
+                            {% if frame.ocr_text %}
+                                <pre class="whitespace-pre-wrap font-mono">{{ frame.ocr_text }}</pre>
+                            {% else %}
+                                <span class="text-muted-foreground italic font-sans">No readable text — likely a graphic, diagram, or video scene.</span>
+                            {% endif %}
+                        </div>
+                        {% if frame.spoken_text %}
+                        <div class="space-y-1 pt-1 border-t border-border/50">
+                            <span class="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                                <i data-lucide="mic" class="h-3 w-3 text-indigo-400"></i> Spoken at this moment
+                            </span>
+                            <p class="text-xs text-foreground/80 leading-snug line-clamp-3">{{ frame.spoken_text }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-span-full p-12 text-center text-xs text-muted-foreground rounded-xl border border-border bg-card">
+                    No slides were captured for this meeting.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- TAB 4: ASK AI COPILOT (LOCAL RAG) -->
+        <div class="tab-pane space-y-6 hidden" id="tab-chat">
+            <div class="rounded-xl border border-border bg-card shadow-sm flex flex-col h-[580px]">
+                <!-- Chat Header -->
+                <div class="p-4 border-b border-border flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                            <i data-lucide="bot" class="h-4 w-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold">Meeting Knowledge Copilot</h3>
+                            <p class="text-[11px] text-muted-foreground">Local RAG query engine across both speech transcript and slide OCR text.</p>
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                        100% Offline Phi-3
+                    </span>
+                </div>
+
+                <!-- Chat Stream -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chatMessages">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs shrink-0 mt-0.5">
+                            <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
+                        </div>
+                        <div class="rounded-lg bg-secondary/80 p-3 text-xs sm:text-sm text-foreground max-w-[85%] leading-relaxed shadow-sm">
+                            <p>Hi! I've loaded the full transcript and visual slides for <strong>{{ meeting.title }}</strong> into the local vector database. Ask me about specific figures, action items, or topics discussed!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Input Row -->
+                <form id="chatForm" class="p-3 border-t border-border flex items-center gap-2" onsubmit="handleChatSubmit(event)">
+                    {% csrf_token %}
+                    <input 
+                        type="text" 
+                        id="chatInput" 
+                        placeholder="Ask a question about this meeting..." 
+                        class="flex h-10 flex-1 rounded-md border border-input bg-background/50 px-3 py-2 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        autocomplete="off" 
+                        required
+                    >
+                    <button 
+                        type="submit" 
+                        id="chatSubmitBtn" 
+                        class="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground shadow transition hover:bg-primary/90 focus-visible:outline-none"
+                    >
+                        <i data-lucide="send" class="h-3.5 w-3.5 mr-1.5"></i> Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

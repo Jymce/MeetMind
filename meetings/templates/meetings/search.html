@@ -1,0 +1,110 @@
+{% extends 'meetings/base.html' %}
+
+{% block title %}Semantic Search — MeetMind Local AI{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <!-- Search Header -->
+    <div class="text-center space-y-2">
+        <div class="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-400">
+            <i data-lucide="database" class="h-3 w-3"></i> ChromaDB Vector Index
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight">Cross-Meeting Semantic Search</h1>
+        <p class="text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto">
+            Search both spoken dialogue and slide OCR content using local embeddings (all-MiniLM-L6-v2). Concept matching works even without exact keywords.
+        </p>
+
+        <!-- Search Bar -->
+        <form method="GET" action="{% url 'search' %}" class="pt-4 max-w-xl mx-auto">
+            <div class="relative flex items-center">
+                <i data-lucide="search" class="absolute left-3.5 h-4 w-4 text-muted-foreground"></i>
+                <input 
+                    type="text" 
+                    name="q" 
+                    value="{{ query }}" 
+                    placeholder="e.g. quarterly revenue decrease, architecture refactor, hiring decisions..." 
+                    class="flex h-11 w-full rounded-full border border-input bg-card pl-10 pr-28 text-xs sm:text-sm text-foreground shadow-sm transition placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
+                    autofocus
+                >
+                <button 
+                    type="submit" 
+                    class="absolute right-1.5 inline-flex h-8 items-center justify-center rounded-full bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow transition hover:bg-primary/90"
+                >
+                    Search
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Section -->
+    {% if query %}
+    <div class="space-y-4 pt-4">
+        <div class="flex items-center justify-between border-b border-border pb-3">
+            <p class="text-xs text-muted-foreground">
+                Matches for: <span class="font-semibold text-foreground">"{{ query }}"</span>
+            </p>
+            <span class="rounded bg-secondary px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                {{ results|length }} matches
+            </span>
+        </div>
+
+        {% if results %}
+        <div class="space-y-3">
+            {% for item in results %}
+            <div class="rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm transition hover:border-zinc-600 space-y-3">
+                <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2">
+                        {% if item.metadata.type == 'speech' %}
+                            <span class="inline-flex items-center gap-1 rounded-md border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[11px] font-medium text-indigo-400">
+                                <i data-lucide="mic" class="h-3 w-3"></i> Spoken Word
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium text-cyan-400">
+                                <i data-lucide="monitor" class="h-3 w-3"></i> Slide OCR
+                            </span>
+                        {% endif %}
+
+                        {% if item.meeting %}
+                        <a href="{% url 'meeting_detail' item.meeting.id %}" class="font-medium text-foreground hover:underline flex items-center gap-1 truncate max-w-xs">
+                            <i data-lucide="video" class="h-3 w-3 text-muted-foreground"></i>
+                            <span>{{ item.meeting.title }}</span>
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    {% if item.metadata.start_time %}
+                    <span class="font-mono text-[11px] text-muted-foreground">
+                        At {{ item.metadata.start_time|floatformat:0 }}s
+                    </span>
+                    {% elif item.metadata.timestamp %}
+                    <span class="font-mono text-[11px] text-muted-foreground">
+                        Slide at {{ item.metadata.timestamp|floatformat:0 }}s
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="rounded-md bg-secondary/40 p-3 text-xs leading-relaxed text-foreground/90">
+                    <p>{{ item.text }}</p>
+                </div>
+
+                {% if item.meeting %}
+                <div class="flex justify-end pt-1">
+                    <a href="{% url 'meeting_detail' item.meeting.id %}" class="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
+                        <span>View in session</span>
+                        <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center text-muted-foreground text-xs">
+            <i data-lucide="help-circle" class="h-8 w-8 mx-auto mb-2 text-zinc-500"></i>
+            <p>No semantic matches found for this query in the local vector database.</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
