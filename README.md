@@ -43,6 +43,15 @@ When someone says *"as you can see here, the numbers dropped significantly"*, a 
 
 ## ⚡ Setup
 
+### Step 0 — Get the code
+
+```powershell
+git clone https://github.com/Jymce/MeetMind.git
+cd MeetMind
+```
+
+> No git? On the GitHub page click **Code → Download ZIP**, extract it, then `cd` into the folder in PowerShell.
+
 ### Option A — One-Shot Installer (Recommended)
 
 Double-click **`setup.bat`**, or run in PowerShell:
@@ -61,6 +70,8 @@ The script does everything automatically and is safe to re-run (it skips what's 
 - ✅ Runs database migrations + optionally seeds a demo meeting
 
 ### Option B — Manual Setup
+
+After cloning (Step 0), run everything yourself:
 
 ```powershell
 python -m venv venv
